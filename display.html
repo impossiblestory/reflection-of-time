@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>시간의 반영</title>
+
+  <style>
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #photo {
+      width: 100vw;
+      height: 100vh;
+      object-fit: contain;
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+  <img id="photo" src="images/current.jpg" alt="">
+
+  <script>
+    const photo = document.getElementById("photo");
+    const imagePath = "images/current.jpg";
+
+    function checkForNewImage() {
+      const nextImage = new Image();
+
+      nextImage.onload = () => {
+        photo.src = nextImage.src;
+      };
+
+      // 새 이미지 로딩에 실패하면 기존 사진을 그대로 유지합니다.
+      nextImage.onerror = () => {};
+
+      // 주소 뒤에 현재 시각을 붙여 브라우저 캐시를 피합니다.
+      nextImage.src = `${imagePath}?t=${Date.now()}`;
+    }
+
+    // 페이지가 열린 뒤 1분마다 새 사진을 확인합니다.
+    setInterval(checkForNewImage, 60_000);
+  </script>
+</body>
+</html>
