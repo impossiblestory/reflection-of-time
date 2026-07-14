@@ -52,8 +52,8 @@
       nextImage.src = `${imagePath}?t=${Date.now()}`;
     }
 
-    // 페이지가 열린 뒤 10분마다 새 사진을 확인합니다.
-    setInterval(checkForNewImage, 600_000);
+    // 페이지가 열린 뒤 5분마다 새 사진을 확인합니다.
+    setInterval(checkForNewImage, 300_000);
   </script>
 </body>
 </html>
