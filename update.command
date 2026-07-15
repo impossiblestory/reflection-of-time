@@ -78,8 +78,14 @@ if [ "$SUCCESS_COUNT" -eq 0 ]; then
   exit 1
 fi
 
-LATEST_TARGET="$(tail -n 1 "$SUCCESS_FILE" | cut -f3)"
-cp "$LATEST_TARGET" "$CURRENT_FILE"
+LATEST_ARCHIVE="$(find "$ARCHIVE_DIR" -maxdepth 1 -type f -name '''*.jpg''' | sort | tail -n 1)"
+
+if [ -z "${LATEST_ARCHIVE:-}" ]; then
+  osascript -e '''display alert "current 지정 실패" message "archive에서 최신 사진을 찾지 못했습니다." as warning'''
+  exit 1
+fi
+
+cp "$LATEST_ARCHIVE" "$CURRENT_FILE"
 
 python3 - "$ARCHIVE_JSON" "$SUCCESS_FILE" <<'PY'
 import json, sys
