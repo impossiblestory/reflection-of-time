@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
+
+# incoming originals are local only
+incoming/*
+!incoming/README.txt
+
+# temporary/editor files
+*.tmp
+*.swp
+*~
+*.bak
+*.psd
+*.psb
+
+# Windows
+Thumbs.db
+Desktop.ini
