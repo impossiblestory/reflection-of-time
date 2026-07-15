@@ -90,7 +90,7 @@ img{
 <main>
   <div id="timeline">
     <section class="entry now-entry" aria-label="현재">
-      <div class="time-label">[NOW]</div>
+      <div class="time-label" id="live-now"></div>
       <div class="now-space" aria-hidden="true"></div>
     </section>
 
@@ -147,6 +147,17 @@ fetch(`archive.json?t=${Date.now()}`,{cache:"no-store"})
     document.getElementById("archive").outerHTML=
       `<p class="message">${error.message}</p>`;
   });
+
+function updateNow(){
+  const d=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const text=`[${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}]`;
+  const el=document.getElementById('live-now');
+  if(el) el.textContent=text;
+}
+updateNow();
+setInterval(updateNow,1000);
+
 </script>
 </body>
 </html>
