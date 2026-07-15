@@ -1,155 +1,97 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <title>Archive</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Archive</title>
 
-  <!-- D2Coding webfont -->
-  <link
-    rel="stylesheet"
-    href="https://cdn.jsdelivr.net/gh/joungkyun/font-d2coding@1.3.2/d2coding.css"
-  >
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/joungkyun/font-d2coding@1.3.2/d2coding.css">
 
-  <style>
-    :root {
-      --page-width: 760px;
-      --side-padding: clamp(18px, 5vw, 44px);
-      --top-space: clamp(64px, 12vh, 140px);
-      --bottom-space: clamp(100px, 18vh, 220px);
-      --item-gap: clamp(96px, 18vh, 220px);
-      --time-gap: 14px;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html {
-      background: #fff;
-    }
-
-    body {
-      margin: 0;
-      color: #111;
-      background: #fff;
-      -webkit-font-smoothing: antialiased;
-      text-rendering: optimizeLegibility;
-    }
-
-    main {
-      width: min(100%, var(--page-width));
-      margin: 0 auto;
-      padding:
-        var(--top-space)
-        var(--side-padding)
-        var(--bottom-space);
-    }
-
-    #archive {
-      display: flex;
-      flex-direction: column;
-      gap: var(--item-gap);
-    }
-
-    article {
-      margin: 0;
-    }
-
-    time {
-      display: block;
-      margin: 0 0 var(--time-gap);
-      font-family: D2Coding, "D2 coding", monospace;
-      font-size: clamp(12px, 3.2vw, 14px);
-      font-weight: 400;
-      line-height: 1.4;
-      letter-spacing: 0;
-      white-space: nowrap;
-      font-variant-numeric: tabular-nums;
-    }
-
-    img {
-      display: block;
-      width: 100%;
-      height: auto;
-      margin: 0;
-      background: #f4f4f4;
-    }
-
-    .empty,
-    .error {
-      margin: 0;
-      font-family: D2Coding, "D2 coding", monospace;
-      font-size: 13px;
-      line-height: 1.6;
-    }
-
-    @media (min-width: 900px) {
-      :root {
-        --page-width: 820px;
-        --time-gap: 16px;
-      }
-    }
-  </style>
+<style>
+:root{
+  --pc-width:500px;
+  --mobile-width:100%;
+  --top:120px;
+  --bottom:180px;
+  --gap:150px;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:#fff;
+  color:#111;
+}
+main{
+  max-width:100%;
+  padding:var(--top) 24px var(--bottom);
+}
+#archive{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:var(--gap);
+}
+article{
+  width:min(var(--pc-width),100%);
+}
+time{
+  display:block;
+  margin:0 0 14px;
+  font-family:D2Coding,monospace;
+  font-size:14px;
+  font-variant-numeric:tabular-nums;
+}
+a{
+  display:block;
+  text-decoration:none;
+}
+img{
+  display:block;
+  width:100%;
+  height:auto;
+}
+@media (max-width:700px){
+  :root{
+    --top:80px;
+    --bottom:120px;
+    --gap:110px;
+  }
+  article{
+    width:100%;
+  }
+  time{
+    font-size:13px;
+  }
+}
+</style>
 </head>
 <body>
-  <main>
-    <section id="archive" aria-label="사진 기록"></section>
-  </main>
+<main>
+<div id="archive"></div>
+</main>
 
-  <script>
-    const archive = document.getElementById("archive");
+<script>
+function trimSeconds(label){
+  const m=String(label).match(/^(\d{4}\.\d{2}\.\d{2})\s+(\d{2}:\d{2})/);
+  return m?`${m[1]} ${m[2]}`:label;
+}
 
-    function removeSeconds(label) {
-      // 2026.07.15 16:29:14 → 2026.07.15 16:29
-      const match = String(label).match(
-        /^(\d{4}\.\d{2}\.\d{2})\s+(\d{2}:\d{2})(?::\d{2})?$/
-      );
-
-      return match ? `${match[1]} ${match[2]}` : String(label);
-    }
-
-    async function loadArchive() {
-      try {
-        const response = await fetch(`archive.json?t=${Date.now()}`, {
-          cache: "no-store"
-        });
-
-        if (!response.ok) {
-          throw new Error("archive.json을 불러오지 못했습니다.");
-        }
-
-        const items = await response.json();
-
-        if (!Array.isArray(items) || items.length === 0) {
-          archive.innerHTML = '<p class="empty">아직 기록된 사진이 없습니다.</p>';
-          return;
-        }
-
-        archive.innerHTML = items.map((item) => {
-          const label = removeSeconds(item.label);
-
-          return `
-            <article>
-              <time datetime="${label.replace(/\./g, "-").replace(" ", "T")}">
-                ${label}
-              </time>
-              <img
-                src="${item.file}"
-                alt=""
-                loading="lazy"
-                decoding="async"
-              >
-            </article>
-          `;
-        }).join("");
-      } catch (error) {
-        archive.innerHTML = `<p class="error">${error.message}</p>`;
-      }
-    }
-
-    loadArchive();
-  </script>
+fetch("archive.json?t="+Date.now(),{cache:"no-store"})
+.then(r=>r.json())
+.then(items=>{
+ document.getElementById("archive").innerHTML=items.map(item=>{
+   const label=trimSeconds(item.label);
+   return `<article>
+      <time>${label}</time>
+      <a href="${item.file}" target="_blank" rel="noopener">
+        <img src="${item.file}" alt="" loading="lazy">
+      </a>
+    </article>`;
+ }).join("");
+})
+.catch(()=>{
+ document.getElementById("archive").innerHTML="<p>archive.json을 불러올 수 없습니다.</p>";
+});
+</script>
 </body>
 </html>
