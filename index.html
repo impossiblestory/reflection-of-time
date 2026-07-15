@@ -3,90 +3,149 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>시간의 반영 — Archive</title>
+  <meta name="color-scheme" content="light">
+  <title>Archive</title>
+
+  <!-- D2Coding webfont -->
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/gh/joungkyun/font-d2coding@1.3.2/d2coding.css"
+  >
+
   <style>
-    * { box-sizing: border-box; }
+    :root {
+      --page-width: 760px;
+      --side-padding: clamp(18px, 5vw, 44px);
+      --top-space: clamp(64px, 12vh, 140px);
+      --bottom-space: clamp(100px, 18vh, 220px);
+      --item-gap: clamp(96px, 18vh, 220px);
+      --time-gap: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      background: #fff;
+    }
+
     body {
       margin: 0;
-      padding: 28px 18px 60px;
       color: #111;
       background: #fff;
-      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
-                   "Noto Sans KR", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
     }
-    header {
-      max-width: 1100px;
-      margin: 0 auto 28px;
-    }
-    h1 {
-      margin: 0 0 8px;
-      font-size: 24px;
-      font-weight: 600;
-    }
-    .subtitle {
-      margin: 0;
-      color: #666;
-      font-size: 14px;
-    }
-    #archive {
-      max-width: 1100px;
+
+    main {
+      width: min(100%, var(--page-width));
       margin: 0 auto;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 28px 18px;
+      padding:
+        var(--top-space)
+        var(--side-padding)
+        var(--bottom-space);
     }
-    figure { margin: 0; }
-    img {
-      width: 100%;
-      aspect-ratio: 1 / 1;
+
+    #archive {
+      display: flex;
+      flex-direction: column;
+      gap: var(--item-gap);
+    }
+
+    article {
+      margin: 0;
+    }
+
+    time {
       display: block;
-      object-fit: contain;
-      background: #f2f2f2;
+      margin: 0 0 var(--time-gap);
+      font-family: D2Coding, "D2 coding", monospace;
+      font-size: clamp(12px, 3.2vw, 14px);
+      font-weight: 400;
+      line-height: 1.4;
+      letter-spacing: 0;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
     }
-    figcaption {
-      padding-top: 8px;
+
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+      margin: 0;
+      background: #f4f4f4;
+    }
+
+    .empty,
+    .error {
+      margin: 0;
+      font-family: D2Coding, "D2 coding", monospace;
       font-size: 13px;
-      color: #333;
-      line-height: 1.45;
+      line-height: 1.6;
     }
-    .empty {
-      max-width: 1100px;
-      margin: 40px auto;
-      color: #777;
+
+    @media (min-width: 900px) {
+      :root {
+        --page-width: 820px;
+        --time-gap: 16px;
+      }
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>시간의 반영</h1>
-    <p class="subtitle">Archive</p>
-  </header>
-
-  <main id="archive"></main>
+  <main>
+    <section id="archive" aria-label="사진 기록"></section>
+  </main>
 
   <script>
+    const archive = document.getElementById("archive");
+
+    function removeSeconds(label) {
+      // 2026.07.15 16:29:14 → 2026.07.15 16:29
+      const match = String(label).match(
+        /^(\d{4}\.\d{2}\.\d{2})\s+(\d{2}:\d{2})(?::\d{2})?$/
+      );
+
+      return match ? `${match[1]} ${match[2]}` : String(label);
+    }
+
     async function loadArchive() {
-      const container = document.getElementById("archive");
       try {
-        const response = await fetch(`archive.json?t=${Date.now()}`);
-        if (!response.ok) throw new Error("archive.json을 불러오지 못했습니다.");
+        const response = await fetch(`archive.json?t=${Date.now()}`, {
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          throw new Error("archive.json을 불러오지 못했습니다.");
+        }
+
         const items = await response.json();
 
-        if (!items.length) {
-          container.outerHTML = '<p class="empty">아직 기록된 사진이 없습니다.</p>';
+        if (!Array.isArray(items) || items.length === 0) {
+          archive.innerHTML = '<p class="empty">아직 기록된 사진이 없습니다.</p>';
           return;
         }
 
-        container.innerHTML = items.map(item => `
-          <figure>
-            <a href="${item.file}" target="_blank" rel="noopener">
-              <img src="${item.file}" loading="lazy" alt="${item.label}">
-            </a>
-            <figcaption>${item.label}</figcaption>
-          </figure>
-        `).join("");
+        archive.innerHTML = items.map((item) => {
+          const label = removeSeconds(item.label);
+
+          return `
+            <article>
+              <time datetime="${label.replace(/\./g, "-").replace(" ", "T")}">
+                ${label}
+              </time>
+              <img
+                src="${item.file}"
+                alt=""
+                loading="lazy"
+                decoding="async"
+              >
+            </article>
+          `;
+        }).join("");
       } catch (error) {
-        container.outerHTML = `<p class="empty">${error.message}</p>`;
+        archive.innerHTML = `<p class="error">${error.message}</p>`;
       }
     }
 
