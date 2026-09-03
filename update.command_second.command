@@ -26,159 +26,56 @@ while IFS= read -r SOURCE_FILE; do
   [ -f "$SOURCE_FILE" ] || continue
   FOUND_COUNT=$((FOUND_COUNT + 1))
 
-  # JPEG는 EXIF DateTimeOriginal(실제 촬영시각)을 파일에서 직접 읽습니다.
-  # 그 값이 없거나 직접 읽을 수 없는 형식(예: HEIC)이면 macOS 메타데이터로 보완합니다.
+  # Spotlight가 반환하는 UTC 시각(+0000)을 Mac의 현지 시간대로 변환합니다.
   LOCAL_TIME="$(python3 - "$SOURCE_FILE" <<'PY'
-import struct
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 
-path = Path(sys.argv[1])
-
-def exif_datetime_original_jpeg(p: Path):
-    """JPEG APP1/Exif의 DateTimeOriginal(0x9003)을 외부 패키지 없이 직접 읽습니다."""
-    data = p.read_bytes()
-    if len(data) < 4 or data[:2] != b"\xff\xd8":
-        return None
-
-    pos = 2
-    while pos + 4 <= len(data):
-        if data[pos] != 0xFF:
-            pos += 1
-            continue
-
-        while pos < len(data) and data[pos] == 0xFF:
-            pos += 1
-        if pos >= len(data):
-            break
-
-        marker = data[pos]
-        pos += 1
-
-        if marker in (0xDA, 0xD9):  # SOS / EOI
-            break
-        if marker == 0x01 or 0xD0 <= marker <= 0xD7:
-            continue
-        if pos + 2 > len(data):
-            break
-
-        seglen = struct.unpack(">H", data[pos:pos+2])[0]
-        if seglen < 2 or pos + seglen > len(data):
-            break
-        seg = data[pos+2:pos+seglen]
-
-        if marker == 0xE1 and seg.startswith(b"Exif\x00\x00"):
-            tiff = seg[6:]
-            if len(tiff) < 8:
-                return None
-
-            byte_order = tiff[:2]
-            if byte_order == b"II":
-                endian = "<"
-            elif byte_order == b"MM":
-                endian = ">"
-            else:
-                return None
-
-            def u16(off):
-                return struct.unpack(endian + "H", tiff[off:off+2])[0]
-
-            def u32(off):
-                return struct.unpack(endian + "I", tiff[off:off+4])[0]
-
-            if u16(2) != 42:
-                return None
-
-            def read_ifd(offset):
-                if offset < 0 or offset + 2 > len(tiff):
-                    return []
-                count = u16(offset)
-                entries = []
-                base = offset + 2
-                for i in range(count):
-                    off = base + i * 12
-                    if off + 12 > len(tiff):
-                        break
-                    tag = u16(off)
-                    typ = u16(off + 2)
-                    cnt = u32(off + 4)
-                    val = tiff[off + 8:off + 12]
-                    entries.append((tag, typ, cnt, val))
-                return entries
-
-            ifd0 = u32(4)
-            exif_ifd = None
-            for tag, typ, cnt, val in read_ifd(ifd0):
-                if tag == 0x8769:  # ExifIFDPointer
-                    exif_ifd = struct.unpack(endian + "I", val)[0]
-                    break
-            if exif_ifd is None:
-                return None
-
-            for tag, typ, cnt, val in read_ifd(exif_ifd):
-                if tag == 0x9003 and typ == 2 and cnt > 0:  # DateTimeOriginal
-                    if cnt <= 4:
-                        raw = val[:cnt]
-                    else:
-                        off = struct.unpack(endian + "I", val)[0]
-                        raw = tiff[off:off+cnt]
-                    s = raw.split(b"\x00", 1)[0].decode("ascii", "ignore").strip()
-                    try:
-                        return datetime.strptime(s, "%Y:%m:%d %H:%M:%S")
-                    except ValueError:
-                        return None
-            return None
-
-        pos += seglen
-
-    return None
+path = sys.argv[1]
 
 def read_mdls(key: str) -> str:
     result = subprocess.run(
-        ["mdls", "-raw", "-name", key, str(path)],
+        ["mdls", "-raw", "-name", key, path],
         capture_output=True,
         text=True,
     )
     return result.stdout.strip()
 
-dt = None
+# 사진을 방금 Mac으로 옮긴 직후에는 Spotlight 메타데이터가 아직
+# 생성되지 않았을 수 있으므로, 촬영시각을 읽기 전에 해당 파일의
+# 메타데이터 가져오기를 한 번 요청합니다.
+subprocess.run(["mdimport", path], capture_output=True, text=True)
 
-# 1순위: JPEG EXIF DateTimeOriginal 직접 판독
-try:
-    dt = exif_datetime_original_jpeg(path)
-except Exception:
-    dt = None
-
-# 2순위: HEIC 등은 macOS가 인식한 콘텐츠 생성시각 사용
-if dt is None:
-    subprocess.run(["mdimport", str(path)], capture_output=True, text=True)
+# kMDItemContentCreationDate는 JPEG/HEIC 등의 촬영 메타데이터(EXIF)를
+# Spotlight가 인식했을 때 실제 촬영시각을 반환합니다. 잠시 기다리며
+# 몇 번 재시도한 뒤에만 파일 생성시각으로 fallback 합니다.
+import time
+raw = ""
+for _ in range(5):
     raw = read_mdls("kMDItemContentCreationDate")
     if raw and raw != "(null)":
-        for fmt in ("%Y-%m-%d %H:%M:%S %z", "%Y-%m-%d %H:%M:%S"):
-            try:
-                parsed = datetime.strptime(raw, fmt)
-                dt = parsed.astimezone().replace(tzinfo=None) if parsed.tzinfo else parsed
-                break
-            except ValueError:
-                pass
+        break
+    time.sleep(0.4)
 
-# 3순위: 파일 생성시각
-if dt is None:
+if not raw or raw == "(null)":
     raw = read_mdls("kMDItemFSCreationDate")
-    if raw and raw != "(null)":
-        for fmt in ("%Y-%m-%d %H:%M:%S %z", "%Y-%m-%d %H:%M:%S"):
-            try:
-                parsed = datetime.strptime(raw, fmt)
-                dt = parsed.astimezone().replace(tzinfo=None) if parsed.tzinfo else parsed
-                break
-            except ValueError:
-                pass
 
-# 최후 fallback
+dt = None
+for fmt in ("%Y-%m-%d %H:%M:%S %z", "%Y-%m-%d %H:%M:%S"):
+    try:
+        dt = datetime.strptime(raw, fmt)
+        break
+    except ValueError:
+        pass
+
 if dt is None:
-    dt = datetime.now()
+    dt = datetime.now().astimezone()
+elif dt.tzinfo is not None:
+    dt = dt.astimezone()
+else:
+    dt = dt.astimezone()
 
 print(dt.strftime("%Y-%m-%d %H:%M:%S"))
 PY
