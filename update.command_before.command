@@ -43,22 +43,7 @@ def read_mdls(key: str) -> str:
     )
     return result.stdout.strip()
 
-# 사진을 방금 Mac으로 옮긴 직후에는 Spotlight 메타데이터가 아직
-# 생성되지 않았을 수 있으므로, 촬영시각을 읽기 전에 해당 파일의
-# 메타데이터 가져오기를 한 번 요청합니다.
-subprocess.run(["mdimport", path], capture_output=True, text=True)
-
-# kMDItemContentCreationDate는 JPEG/HEIC 등의 촬영 메타데이터(EXIF)를
-# Spotlight가 인식했을 때 실제 촬영시각을 반환합니다. 잠시 기다리며
-# 몇 번 재시도한 뒤에만 파일 생성시각으로 fallback 합니다.
-import time
-raw = ""
-for _ in range(5):
-    raw = read_mdls("kMDItemContentCreationDate")
-    if raw and raw != "(null)":
-        break
-    time.sleep(0.4)
-
+raw = read_mdls("kMDItemContentCreationDate")
 if not raw or raw == "(null)":
     raw = read_mdls("kMDItemFSCreationDate")
 
